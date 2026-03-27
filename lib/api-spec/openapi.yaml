@@ -1,22 +1,26 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Attendance Tracker API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: events
+    description: Event management
+  - name: staff
+    description: Staff management
+  - name: attendance
+    description: Attendance recording
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +28,200 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /events:
+    get:
+      operationId: listEvents
+      tags: [events]
+      summary: List all events
+      responses:
+        "200":
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+    post:
+      operationId: createEvent
+      tags: [events]
+      summary: Create a new event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEventRequest"
+      responses:
+        "201":
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+
+  /events/{eventId}:
+    get:
+      operationId: getEvent
+      tags: [events]
+      summary: Get event by ID
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Event details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "404":
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /staff:
+    get:
+      operationId: listStaff
+      tags: [staff]
+      summary: List all staff members
+      responses:
+        "200":
+          description: List of staff
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Staff"
+
+  /staff/scan:
+    post:
+      operationId: scanBarcode
+      tags: [staff]
+      summary: Process a scanned barcode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScanRequest"
+      responses:
+        "200":
+          description: Scan result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanResult"
+
+  /staff/{staffId}/barcode:
+    put:
+      operationId: assignBarcode
+      tags: [staff]
+      summary: Assign a barcode to a staff member
+      parameters:
+        - name: staffId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignBarcodeRequest"
+      responses:
+        "200":
+          description: Barcode assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Staff"
+        "404":
+          description: Staff not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Barcode already assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /attendance:
+    post:
+      operationId: recordAttendance
+      tags: [attendance]
+      summary: Record attendance for a staff member at an event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordAttendanceRequest"
+      responses:
+        "201":
+          description: Attendance recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceRecord"
+        "409":
+          description: Already checked in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /attendance/event/{eventId}:
+    get:
+      operationId: getEventAttendance
+      tags: [attendance]
+      summary: Get attendance for an event
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Attendance list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AttendanceRecord"
+
+  /attendance/event/{eventId}/export:
+    get:
+      operationId: exportAttendanceCsv
+      tags: [attendance]
+      summary: Export attendance as CSV
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +232,134 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+        - message
+
+    Event:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        dateTime:
+          type: string
+        location:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - dateTime
+        - location
+        - createdAt
+
+    CreateEventRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        dateTime:
+          type: string
+        location:
+          type: string
+      required:
+        - name
+        - dateTime
+        - location
+
+    Staff:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        barcodeId:
+          type: string
+          nullable: true
+        department:
+          type: string
+          nullable: true
+      required:
+        - id
+        - name
+        - barcodeId
+        - department
+
+    ScanRequest:
+      type: object
+      properties:
+        barcodeId:
+          type: string
+        eventId:
+          type: integer
+      required:
+        - barcodeId
+        - eventId
+
+    ScanResult:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [found, not_found, already_checked_in, recorded]
+        staff:
+          $ref: "#/components/schemas/Staff"
+          nullable: true
+        attendance:
+          $ref: "#/components/schemas/AttendanceRecord"
+          nullable: true
+        message:
+          type: string
+      required:
+        - status
+        - message
+
+    AssignBarcodeRequest:
+      type: object
+      properties:
+        barcodeId:
+          type: string
+      required:
+        - barcodeId
+
+    RecordAttendanceRequest:
+      type: object
+      properties:
+        staffId:
+          type: integer
+        eventId:
+          type: integer
+      required:
+        - staffId
+        - eventId
+
+    AttendanceRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        staffId:
+          type: integer
+        eventId:
+          type: integer
+        staffName:
+          type: string
+        checkedInAt:
+          type: string
+      required:
+        - id
+        - staffId
+        - eventId
+        - staffName
+        - checkedInAt

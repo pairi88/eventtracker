@@ -1,0 +1,15 @@
+packages:
+  "@zxing/browser": "Browser-based barcode scanning library"
+  "@zxing/library": "Core logic for zxing barcode scanning"
+  "date-fns": "For human-readable date formatting"
+  "lucide-react": "For beautiful icons"
+
+images:
+  - path: "artifacts/attendance-tracker/public/images/event-hero.png"
+    description: "Abstract soft gradient background with geometric shapes in deep blue and teal, professional and welcoming"
+    aspect_ratio: "16:9"
+
+notes:
+  - Using @zxing/browser for robust camera-based scanning
+  - AudioContext used for successful scan beep
+  - API base path is /api, handled by shared proxy
