@@ -1,11 +1,29 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
+import { DecodeHintType, BarcodeFormat } from '@zxing/library';
 
 interface UseScannerProps {
   onScan: (result: string) => void;
   cooldownMs?: number;
   paused?: boolean;
 }
+
+const HINTS = new Map<DecodeHintType, unknown>();
+HINTS.set(DecodeHintType.POSSIBLE_FORMATS, [
+  BarcodeFormat.CODE_39,
+  BarcodeFormat.CODE_128,
+  BarcodeFormat.CODE_93,
+  BarcodeFormat.EAN_13,
+  BarcodeFormat.EAN_8,
+  BarcodeFormat.UPC_A,
+  BarcodeFormat.UPC_E,
+  BarcodeFormat.ITF,
+  BarcodeFormat.CODABAR,
+  BarcodeFormat.QR_CODE,
+  BarcodeFormat.DATA_MATRIX,
+  BarcodeFormat.PDF_417,
+]);
+HINTS.set(DecodeHintType.TRY_HARDER, true);
 
 export function useScanner({ onScan, cooldownMs = 2000, paused = false }: UseScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -17,7 +35,7 @@ export function useScanner({ onScan, cooldownMs = 2000, paused = false }: UseSca
 
   useEffect(() => {
     let mounted = true;
-    const reader = new BrowserMultiFormatReader();
+    const reader = new BrowserMultiFormatReader(HINTS);
 
     const startScanning = async () => {
       if (!videoRef.current || paused) return;
