@@ -9,7 +9,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2 text-primary">
             <ShieldCheck className="w-7 h-7" />
             <span className="font-display font-bold text-xl tracking-tight text-slate-900">
-              Attend<span className="text-primary">Track</span>
+              ProseAttend<span className="text-primary">Track</span>
             </span>
           </div>
         </div>
