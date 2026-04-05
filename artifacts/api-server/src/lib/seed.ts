@@ -1,5 +1,6 @@
 import { db, staffTable } from "@workspace/db";
 import { logger } from "./logger";
+import { sql } from "drizzle-orm";
 
 const STAFF_SEED = [
   { name: "Philip Gibbs", department: "President" },
@@ -52,15 +53,57 @@ const STAFF_SEED = [
 
 export async function seedStaffIfEmpty(): Promise<void> {
   try {
-    const existing = await db.select().from(staffTable).limit(1);
-    if (existing.length > 0) {
-      logger.info("Staff table already has records, skipping seed.");
+    const existing = await db.select().from(staffTable);
+    const existingCount = existing.length;
+    const targetCount = STAFF_SEED.length;
+
+    if (existingCount === targetCount) {
+      logger.info({ count: existingCount }, "Staff table is complete, skipping seed.");
       return;
     }
 
-    logger.info("Staff table is empty — seeding staff records...");
-    await db.insert(staffTable).values(STAFF_SEED);
-    logger.info({ count: STAFF_SEED.length }, "Staff seed complete.");
+    logger.info({ existingCount, targetCount }, "Staff table is incomplete — syncing records...");
+
+    // Build a map of canonical names (trimmed, lowercased) → seed entry
+    const seedMap = new Map(
+      STAFF_SEED.map(s => [s.name.trim().toLowerCase(), s])
+    );
+
+    // Map existing rows by normalised name
+    const existingMap = new Map(
+      existing.map(r => [r.name.trim().toLowerCase(), r])
+    );
+
+    // Clear out stale rows whose names are not in the canonical seed list
+    // (only those without a barcode assigned, to protect real mappings)
+    const staleRows = existing.filter(
+      r => !seedMap.has(r.name.trim().toLowerCase()) && !r.barcodeId
+    );
+    for (const row of staleRows) {
+      await db.execute(sql`DELETE FROM staff WHERE id = ${row.id} AND barcode_id IS NULL`);
+      logger.info({ id: row.id, name: row.name }, "Removed stale staff record.");
+    }
+
+    // Insert missing records
+    const missing = STAFF_SEED.filter(s => !existingMap.has(s.name.trim().toLowerCase()));
+    if (missing.length > 0) {
+      await db.insert(staffTable).values(missing);
+      logger.info({ count: missing.length }, "Inserted missing staff records.");
+    }
+
+    // Fix blank departments for existing records
+    for (const row of existing) {
+      const canonical = seedMap.get(row.name.trim().toLowerCase());
+      if (canonical && (!row.department || row.department !== canonical.department)) {
+        await db.execute(
+          sql`UPDATE staff SET department = ${canonical.department} WHERE id = ${row.id}`
+        );
+        logger.info({ id: row.id, name: row.name, department: canonical.department }, "Fixed department.");
+      }
+    }
+
+    const finalCount = (await db.select().from(staffTable)).length;
+    logger.info({ finalCount }, "Staff sync complete.");
   } catch (err) {
     logger.error({ err }, "Failed to seed staff table.");
   }
