@@ -4,11 +4,13 @@ import { useGetEvent, useScanBarcode } from '@workspace/api-client-react';
 import { Layout } from '@/components/layout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Camera, ClipboardList, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Camera, ClipboardList, CheckCircle2, AlertCircle, RefreshCw, ArrowLeftRight } from 'lucide-react';
 import { useScanner } from '@/hooks/use-scanner';
 import { useAudioFeedback } from '@/hooks/use-audio-feedback';
 import { AssignDialog } from '@/components/assign-dialog';
 import { cn } from '@/lib/utils';
+
+const LAST_EVENT_KEY = 'proseattendtrack_last_event_id';
 
 type ScanStatus = 'idle' | 'success' | 'duplicate' | 'error';
 
@@ -20,6 +22,18 @@ export function AttendanceScreen() {
   const { data: event, isLoading: isLoadingEvent, isError } = useGetEvent(numericEventId);
   const scanMutation = useScanBarcode();
   const { playSuccessBeep, playErrorBeep } = useAudioFeedback();
+
+  // Remember this event so the app can resume it after a refresh
+  useEffect(() => {
+    if (numericEventId) {
+      localStorage.setItem(LAST_EVENT_KEY, String(numericEventId));
+    }
+  }, [numericEventId]);
+
+  const handleChangeEvent = () => {
+    sessionStorage.setItem('proseattendtrack_choosing', '1');
+    setLocation('/');
+  };
 
   // State
   const [scanStatus, setScanStatus] = useState<ScanStatus>('idle');
@@ -109,12 +123,18 @@ export function AttendanceScreen() {
               Scanning Active
             </p>
           </div>
-          <Link href={`/event/${numericEventId}/log`} className="shrink-0">
-            <Button variant="outline" className="gap-2 bg-slate-50">
-              <ClipboardList className="w-4 h-4" />
-              <span className="hidden sm:inline">View Log</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="outline" size="sm" className="gap-2 bg-slate-50" onClick={handleChangeEvent}>
+              <ArrowLeftRight className="w-4 h-4" />
+              <span className="hidden sm:inline">Change Event</span>
             </Button>
-          </Link>
+            <Link href={`/event/${numericEventId}/log`}>
+              <Button variant="outline" size="sm" className="gap-2 bg-slate-50">
+                <ClipboardList className="w-4 h-4" />
+                <span className="hidden sm:inline">View Log</span>
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Camera Viewfinder Area */}
