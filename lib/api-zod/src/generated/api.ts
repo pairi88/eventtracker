@@ -51,6 +51,13 @@ export const GetEventResponse = zod.object({
 });
 
 /**
+ * @summary Delete an event and all its attendance records
+ */
+export const DeleteEventParams = zod.object({
+  eventId: zod.coerce.number(),
+});
+
+/**
  * @summary List all staff members
  */
 export const ListStaffResponseItem = zod.object({

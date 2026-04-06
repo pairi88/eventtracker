@@ -4,8 +4,18 @@ import { Layout } from '@/components/layout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, MapPin, Tag, History, ChevronRight, PlusCircle } from 'lucide-react';
-import { useCreateEvent, useListEvents } from '@workspace/api-client-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { CalendarDays, MapPin, Tag, History, ChevronRight, PlusCircle, Trash2 } from 'lucide-react';
+import { useCreateEvent, useListEvents, useDeleteEvent } from '@workspace/api-client-react';
 import { useToast } from '@/hooks/use-toast';
 
 const LAST_EVENT_KEY = 'proseattendtrack_last_event_id';
@@ -25,9 +35,11 @@ export function EventSetup() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const createEventMutation = useCreateEvent();
-  const { data: pastEvents = [], isLoading: loadingEvents } = useListEvents();
+  const deleteEventMutation = useDeleteEvent();
+  const { data: pastEvents = [], isLoading: loadingEvents, refetch: refetchEvents } = useListEvents();
 
   const [tab, setTab] = useState<'resume' | 'new'>('resume');
+  const [eventToDelete, setEventToDelete] = useState<{ id: number; name: string } | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     dateTime: new Date().toISOString().slice(0, 16),
@@ -60,6 +72,24 @@ export function EventSetup() {
   const resumeEvent = (id: number) => {
     localStorage.setItem(LAST_EVENT_KEY, String(id));
     setLocation(`/event/${id}`);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!eventToDelete) return;
+    try {
+      await deleteEventMutation.mutateAsync({ eventId: eventToDelete.id });
+      // If we just deleted the last-used event, clear the stored reference
+      const lastId = localStorage.getItem(LAST_EVENT_KEY);
+      if (lastId === String(eventToDelete.id)) {
+        localStorage.removeItem(LAST_EVENT_KEY);
+      }
+      await refetchEvents();
+      toast({ title: "Event deleted", description: `"${eventToDelete.name}" has been removed.` });
+    } catch {
+      toast({ variant: "destructive", title: "Delete failed", description: "Could not delete the event. Please try again." });
+    } finally {
+      setEventToDelete(null);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -166,19 +196,30 @@ export function EventSetup() {
               ) : (
                 <div className="space-y-2">
                   {sortedEvents.map(event => (
-                    <button
+                    <div
                       key={event.id}
-                      onClick={() => resumeEvent(event.id)}
-                      className="w-full flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-white hover:border-primary hover:bg-primary/5 transition-all group text-left"
+                      className="flex items-center gap-2"
                     >
-                      <div className="min-w-0">
-                        <p className="font-semibold text-slate-900 truncate">{event.name}</p>
-                        <p className="text-sm text-muted-foreground mt-0.5">
-                          {formatDateTime(event.dateTime)} &nbsp;·&nbsp; {event.location}
-                        </p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-primary flex-shrink-0 ml-3 transition-colors" />
-                    </button>
+                      <button
+                        onClick={() => resumeEvent(event.id)}
+                        className="flex-1 flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-white hover:border-primary hover:bg-primary/5 transition-all group text-left min-w-0"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-900 truncate">{event.name}</p>
+                          <p className="text-sm text-muted-foreground mt-0.5">
+                            {formatDateTime(event.dateTime)} &nbsp;·&nbsp; {event.location}
+                          </p>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-primary flex-shrink-0 ml-3 transition-colors" />
+                      </button>
+                      <button
+                        onClick={() => setEventToDelete({ id: event.id, name: event.name })}
+                        className="p-3 rounded-xl border border-slate-200 bg-white hover:border-red-300 hover:bg-red-50 text-slate-400 hover:text-red-500 transition-all flex-shrink-0"
+                        title="Delete event"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -249,6 +290,26 @@ export function EventSetup() {
           </Card>
         )}
       </div>
+
+      <AlertDialog open={!!eventToDelete} onOpenChange={open => { if (!open) setEventToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this event?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{eventToDelete?.name}</strong> and all its attendance records will be permanently deleted. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {deleteEventMutation.isPending ? "Deleting..." : "Delete Event"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }

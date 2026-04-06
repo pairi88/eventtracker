@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, eventsTable } from "@workspace/db";
+import { db, eventsTable, attendanceTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import {
   CreateEventBody,
@@ -63,6 +63,25 @@ router.get("/events/:eventId", async (req, res): Promise<void> => {
     location: event.location,
     createdAt: event.createdAt.toISOString(),
   }));
+});
+
+router.delete("/events/:eventId", async (req, res): Promise<void> => {
+  const params = GetEventParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "validation_error", message: params.error.message });
+    return;
+  }
+
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, params.data.eventId));
+  if (!event) {
+    res.status(404).json({ error: "not_found", message: "Event not found" });
+    return;
+  }
+
+  await db.delete(attendanceTable).where(eq(attendanceTable.eventId, params.data.eventId));
+  await db.delete(eventsTable).where(eq(eventsTable.id, params.data.eventId));
+
+  res.status(204).send();
 });
 
 export default router;
